@@ -4,7 +4,9 @@ ________________________________________________________________________________
 
 Created By: Cynthia Kamau (Cyndie)
 
-Bioinformatics Intern Cohort 6- 2022
+Bioinformatics, System Admin intern at ICIPE, Kenya (International Center of Insect Physiology and Ecology).
+
+Objective: Set Up a HPC Cluster from scratch.
 ___________________________________________________________________________________________________________________________________________________________
 
 

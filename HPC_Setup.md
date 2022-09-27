@@ -717,3 +717,85 @@ Membership information
 ```
 
 At this point my brain was so fried from running commands I didn't notice I was working on Node2. But everything is well connected!. We'll stop there for now. If you've made it here so far, pat yourself on the back! You're a HPC System Admin already hehe.
+
+
+## Remote Login Without Password via SSH
+
+* To login as root to other nodes without having to be prompted for a password, we'll generate a `SSH Key` from the head node, and share it across our server nodes.
+
+* We'll first generate a key on the head node using the `ssh-keygen` command.
+
+```
+[root@localhost ~]# ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+SHA256:e5cyGrvk0eD0QDJW9Y04fsB/S311YrOOsa26kwFxV9o root@localhost.localdomain
+The key's randomart image is:
++---[RSA 2048]----+
+|        ...  ..  |
+|       ....o.=   |
+|      + .o=.+ E o|
+|     . +.. + . =o|
+|        S.. + + o|
+|       o *.. X ..|
+|        * *o= +  |
+|       o *o+ .   |
+|        =.o+.    |
++----[SHA256]-----+
+
+```
+* It will now generate a  directory called `.ssh`, with the public Key stored in `id_rsa.pub` and the private key on `id_rsa`.
+
+We'll copy the whole directory to other nodes using **Secure Copy** `scp -r`.
+
+```
+[root@localhost ~]# scp -r ~/.ssh server1.hpc.com:
+root@server1.hpc.com's password: 
+known_hosts                                                                                                                                   100%  366   288.8KB/s   00:00    
+id_rsa                                                                                                                                        100% 1675     1.3MB/s   00:00    
+id_rsa.pub                                                                                                                                    100%  408   343.7KB/s   00:00    
+authorized_keys                                                                                                                               100%  408   388.7KB/s   00:00    
+[root@localhost ~]#
+
+```
+
+* To test out if we can login to Node1 without a password prompt, we'll use `ssh` .
+
+```
+[root@localhost ~]# ssh server1.hpc.com
+Last login: Tue Sep 27 10:26:11 2022 from admin.hpc.com
+[root@localhost ~]#
+
+```
+
+* It's well connected.
+
+* We'll connect Node2 as well.
+
+
+```
+[root@localhost ~]# scp -r ~/.ssh cynhpc:
+root@cynhpc's password: 
+known_hosts                                                                                                                                   100%  366    77.9KB/s   00:00    
+id_rsa                                                                                                                                        100% 1675     1.5MB/s   00:00    
+id_rsa.pub                                                                                                                                    100%  408   415.6KB/s   00:00    
+authorized_keys                                                                                                                               100%  408   478.7KB/s   00:00    
+[root@localhost ~]# 
+
+```
+
+* Okay let's test it out.
+
+```
+[root@localhost ~]# ssh cynhpc
+Last login: Tue Sep 27 10:34:54 2022 from admin.hpc.com
+[root@cynhpc ~]# 
+
+```
+
+* Great! We can now login without a password prompt. Unprotected keys are however not recommended for servers exposed to outside networks.

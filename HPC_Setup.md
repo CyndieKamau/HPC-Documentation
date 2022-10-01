@@ -799,3 +799,610 @@ Last login: Tue Sep 27 10:34:54 2022 from admin.hpc.com
 ```
 
 * Great! We can now login without a password prompt. Unprotected keys are however not recommended for servers exposed to outside networks.
+
+## Configuring a Parallel Shell using `pdsh` Tool
+
+* To configure a parallel shell to run commands across various nodes simultaneously, you configure the `pdsh` tool.
+
+* On the head node, you first ensure `epel-release` package is present before installing `pdsh`, using the ` yum repolist` command.
+
+```
+[root@admin ~]# yum repolist
+Loaded plugins: fastestmirror, langpacks
+Loading mirror speeds from cached hostfile
+ * base: mirror.aptus.co.tz
+ * epel: d2lzkl7pfhq30w.cloudfront.net
+ * extras: mirror.aptus.co.tz
+ * updates: mirror.aptus.co.tz
+repo id                                                               repo name                                                                                           status
+base/7/x86_64                                                         CentOS-7 - Base                                                                                     10,072
+epel/x86_64                                                           Extra Packages for Enterprise Linux 7 - x86_64                                                      13,752
+extras/7/x86_64                                                       CentOS-7 - Extras                                                                                      516
+updates/7/x86_64                                                      CentOS-7 - Updates                                                                                   4,244
+repolist: 28,584
+
+```
+
+* If the Epel package is not present, you install it using the `yum -y install epel-release` command.
+
+* You then install `pdsh` using the `yum install pdsh` command.
+
+* To check the version, use the `pdsh -V` command.
+
+```
+[root@admin ~]# pdsh -V
+pdsh-2.34 (+readline+debug)
+rcmd modules: ssh,exec (default: ssh)
+misc modules: (none)
+
+```
+
+* Since we had already connected our nodes to a cluster, configuring a parallel shell is easy.
+
+* We'll use the `pdsh -w` and list the nodes based on their hostnames.
+
+```
+[root@admin ~]# pdsh -w admin.hpc.com ls -s
+admin: ssh_askpass: exec(/usr/libexec/openssh/ssh-askpass): No such file or directory
+admin: Host key verification failed.
+pdsh@admin: admin: ssh exited with exit code 255
+
+```
+
+Aaand an error occurs! It seems we don't have `ssh-askpass` in our system.
+
+* To install `ssh-askpass`, we first configure `makecache`.
+
+```
+[root@admin ~]# yum makecache
+Loaded plugins: fastestmirror, langpacks
+Loading mirror speeds from cached hostfile
+epel/x86_64/metalink                                                                                                                                     |  65 kB  00:00:00     
+ * base: mirror.aptus.co.tz
+ * epel: ftp.plusline.net
+ * extras: mirror.aptus.co.tz
+ * updates: mirror.aptus.co.tz
+base                                                                                                                                                     | 3.6 kB  00:00:00     
+extras                                                                                                                                                   | 2.9 kB  00:00:00     
+updates                                                                                                                                                  | 2.9 kB  00:00:00     
+(1/7): epel/x86_64/filelists_db                                                                                                                          |  12 MB  00:00:01     
+(2/7): base/7/x86_64/filelists_db                                                                                                                        | 7.2 MB  00:00:01     
+(3/7): epel/x86_64/prestodelta                                                                                                                           |  510 B  00:00:00     
+(4/7): epel/x86_64/other_db                                                                                                                              | 3.4 MB  00:00:00     
+(5/7): extras/7/x86_64/filelists_db                                                                                                                      | 277 kB  00:00:00     
+(6/7): updates/7/x86_64/filelists_db                                                                                                                     | 9.5 MB  00:00:01     
+(7/7): base/7/x86_64/other_db                                                                                                                            | 2.6 MB  00:00:02     
+Metadata Cache Created
+
+```
+
+* After creating a Cache, we then install `ssh-askpass` using `yum`.
+
+```
+[root@admin ~]# yum -y install openssh-askpass
+Loaded plugins: fastestmirror, langpacks
+Loading mirror speeds from cached hostfile
+ * base: mirror.aptus.co.tz
+ * epel: d2lzkl7pfhq30w.cloudfront.net
+ * extras: mirror.aptus.co.tz
+ * updates: mirror.aptus.co.tz
+Resolving Dependencies
+--> Running transaction check
+---> Package openssh-askpass.x86_64 0:7.4p1-22.el7_9 will be installed
+--> Finished Dependency Resolution
+
+Dependencies Resolved
+
+================================================================================================================================================================================
+ Package                                       Arch                                 Version                                         Repository                             Size
+================================================================================================================================================================================
+Installing:
+ openssh-askpass                               x86_64                               7.4p1-22.el7_9                                  updates                                77 k
+
+Transaction Summary
+================================================================================================================================================================================
+Install  1 Package
+
+Total download size: 77 k
+Installed size: 16 k
+Downloading packages:
+openssh-askpass-7.4p1-22.el7_9.x86_64.rpm                                                                                                                |  77 kB  00:00:00     
+Running transaction check
+Running transaction test
+Transaction test succeeded
+Running transaction
+  Installing : openssh-askpass-7.4p1-22.el7_9.x86_64                                                                                                                        1/1 
+  Verifying  : openssh-askpass-7.4p1-22.el7_9.x86_64                                                                                                                        1/1 
+
+Installed:
+  openssh-askpass.x86_64 0:7.4p1-22.el7_9                                                                                                                                       
+
+Complete!
+
+```
+* To make `pdsh` run with `ssh` enabled, you add this command to the `bashrc` file;
+
+`export PDSH_RCMD_TYPE=ssh`
+
+* To create the environment variable, you can either logout then login again, or run `source bashrc`.
+
+* We can now use `pdsh` successfully.
+
+```
+[root@admin ~]# pdsh -w admin.hpc.com ls -s
+admin: Warning: Permanently added 'admin.hpc.com,10.2.13.21' (ECDSA) to the list of known hosts.
+admin: total 2196
+admin:    4 anaconda-ks.cfg
+admin:    4 automake-1.14
+admin: 2184 automake-1.14.tar.gz
+admin:    4 initial-setup-ks.cfg
+
+```
+
+* We can now `pdsh` into a node successfully. What about running a command to all nodes simultaneously?
+
+
+* We'll need to create a file like `/etc/hosts`,to list all nodes' IP addresses and host names, for `pdsh` to use it.
+
+
+```
+[root@admin ~]# mkdir PDSH
+[root@admin ~]# cd PDSH/
+[root@admin PDSH]# nano hosts
+
+```
+* Inside the `hosts` file, we list all IP addresses without adding any spaces.
+
+```
+10.2.13.21 admin.hpc.com hpcadmin
+10.4.1.36 server1.hpc.com server1
+10.2.13.29 cynhpc server2
+hosts (END)
+
+```
+
+* We'll then export `WCOLL`, an environment variable that points `pdsh` to the file with a list of hosts.
+
+```
+[root@admin PDSH]# export WCOLL=/root/PDSH/hosts
+
+```
+
+* We'll also add it to the `bashrc` file, then logout, login to create the environment variable.
+
+
+* With that set, we can now run multiple shells at the same time, using `pdsh -w` command.
+
+
+```
+[root@admin ~]# pdsh -w admin.hpc.com,cynhpc,server1.hpc.com hostname 
+admin: admin.hpc.com
+cynhpc: cynhpc
+server1: server1.hpc.com
+
+```
+
+* Here, I used `pdsh` to find the hostnames for all 3 nodes simultaneously. Our Parallel Shell is now ready to go!!
+
+
+# 5. Setting Up Slurm Job Scheduler
+
+Slurm is an open-source workload manager designed for Linux clusters of all sizes. It’s a great system for queuing jobs for your HPC applications.
+
+The installation procedure is described below.
+
+## 5.1 Installing MariaDB Database
+
+MariaDB is important to store the accounting that Slurm provides. It's only installed in the head node.
+
+`yum install mariadb-server mariadb-devel -y`
+
+We'll finish configuring it after Slurm.
+
+## 5.2 Configuring User and Group IDs for Slurm, Munge
+
+Slurm and Munge require a consistent Group ID in all the nodes, which are listed in the `/etc/group` file.
+
+To configure this;
+
+* We open the file `/etc/group`, check the used IDs to look for a unique one for Munge and Slurm.
+* It should be between 900 and 999, as 1000 is for our admin user.
+
+```
+input:x:998:
+systemd-journal:x:190:
+systemd-network:x:192:
+dbus:x:81:
+polkitd:x:997:
+apache:x:48:
+printadmin:x:996:
+cgred:x:995:
+colord:x:994:
+unbound:x:993:
+gluster:x:992:
+libstoragemgmt:x:991:
+rpc:x:32:
+saned:x:990:
+dip:x:40:
+ssh_keys:x:989:
+saslauth:x:76:
+abrt:x:173:
+rtkit:x:172:
+pulse-access:x:988:
+pulse-rt:x:987:
+pulse:x:171:
+
+```
+
+Here's a snippet of my `/etc/group` file. I chose `980` for `munge`, `979` for `slurm`.
+
+With that set, let's configure the GIDs.
+
+* We first export a variable `MUNGEUSER` with the GID.
+
+`[root@admin ~]# export MUNGEUSER=980`
+
+* After creating the variable, we then create the `munge` group using `groupadd -g`
+
+`[root@admin ~]# groupadd -g $MUNGEUSER munge`
+
+* To confirm it's been successfully added, we check our `/etc/group` file.
+
+```
+tcpdump:x:72:
+cynhpcadmin:x:1000:cynhpcadmin
+munge:x:980:
+
+```
+* It's been successfully created.
+
+* We then create Munge user using `useradd`
+
+```
+[root@admin ~]# useradd  -m -c "MUNGE Uid 'N' Gid Emporium" -d /var/lib/munge -u $MUNGEUSER -g munge  -s /sbin/nologin munge
+useradd: invalid user ID '-g' 
+
+```
+* It might bring the error above, but after some time it works.
+
+* Do the same in all nodes.
+
+## 5.3 Installing Munge
+
+* WE first ensure the latest EPEL repository is in our system.
+
+`yum install epel-release`
+
+* We can now install Munge.
+
+`yum install munge munge-libs munge-devel -y`
+
+* After installing Munge, we'll need to create a secret key on our head node, then copy it to other nodes.
+
+* First, we install rng-tools to properly create the key.
+
+
+```
+yum install rng-tools -y
+rngd -r /dev/urandom
+
+```
+
+* Now, we create the secret key. 
+
+```
+/usr/sbin/create-munge-key -r
+
+dd if=/dev/urandom bs=1 count=1024 > /etc/munge/munge.key
+chown munge: /etc/munge/munge.key
+chmod 400 /etc/munge/munge.key
+
+```
+
+* After the secret key is created, we,ll send this key to all of the compute nodes, using `scp`
+
+```
+[root@admin ~]# scp /etc/munge/munge.key root@server1.hpc.com:/etc/munge
+[root@admin ~]# scp /etc/munge/munge.key root@cynhpc:/etc/munge
+
+```
+
+* Now, we SSH into every node and correct the permissions as well as start the Munge service.
+
+```
+chown -R munge: /etc/munge/ /var/log/munge/
+chmod 0700 /etc/munge/ /var/log/munge/
+
+```
+
+* To start the Munge service;
+
+```
+systemctl enable munge
+systemctl start munge
+
+```
+
+* To test Munge, we can try to access our Node1 with Munge from Node2
+
+
+```
+[root@cynhpc ~]# munge -n
+[root@cynhpc ~]# munge -n | unmunge
+[root@cynhpc ~]# munge -n | ssh server1.hpc.com unmunge
+STATUS:           Success (0)
+ENCODE_HOST:      cynhpc (10.2.13.29)
+ENCODE_TIME:      2022-09-29 12:49:05 +0300 (1664444945)
+DECODE_TIME:      2022-09-29 12:49:05 +0300 (1664444945)
+TTL:              300
+CIPHER:           aes128 (4)
+MAC:              sha1 (3)
+ZIP:              none (0)
+UID:              root (0)
+GID:              root (0)
+LENGTH:           0
+
+```
+
+## 5.4 Setting Up NFS (Network File System)
+
+Here's how I set up my NFS to share files across the nodes;
+
+**Setting Up The NFS Master Server**
+
+* Install a couple of NFS libraries on the head node:
+
+`yum install nfs-utils nfs-utils-lib -y`
+
+* We then enable the NFS Server.
+
+```
+systemctl enable rpcbind nfs-server
+systemctl start rpcbind nfs-server
+
+```
+
+* We create a new empty folder that will be the shared folder:
+
+`mkdir /nfsshare`
+
+* We then edit the `/etc/exports` file created; We add our name of the shared folder and the IP addresses that we want the shared folder to be shared,together with file permissions:
+
+```
+/nfsshare server1.hpc.com(rw,sync,no_root_squash,no_subtree_check)
+/nfsshare cynhpc(rw,sync,no_root_squash,no_subtree_check)
+
+```
+
+* We load the `/etc/exports`  to add the new changes:
+
+`exportfs -a`
+
+* We then change the firewall to allow NFS and complimenting services:
+
+```
+firewall-cmd --permanent --zone=public --add-service=nfs
+firewall-cmd --permanent --zone=public --add-service=mountd
+firewall-cmd --permanent --zone=public --add-service=rpc-bind
+firewall-cmd --reload
+
+```
+
+* We then restart NFS service:
+
+`systemctl restart nfs`
+
+**Setting up NFS Client: node1, node2**
+
+* Install a couple of NFS libraries:
+
+```
+yum install nfs-utils nfs-utils-lib -y
+
+```
+
+* Make a folder where the shared folder from master will be mounted on node1, node2:
+
+`mkdir /nfsshare`
+
+* Make sure that the following two commands do not return any errors:
+
+```
+showmount -e admin.hpc.com
+rpcinfo -p admin.hpc.com
+mount admin.hpc.com:/nfsshare /nfsshare
+
+```
+
+* To see if `admin.hpc.com:/nfsshare mount` has been created:
+
+`df -h`
+
+* To test if the shared folder actually works:
+
+`touch /nfsshare/test.txt`
+
+* On master, if we cd /nfsshare, we will see test.txt is inside the folder.
+
+* NFS is now successfully configured.
+
+## 5.5 Installing Slurm
+
+(Documentation On Slurm Installation In Progress)
+
+## **Current Slurm Errors**
+`
+### 1. On the Compute Nodes
+
+```
+[root@admin ~]# pdsh -w server1.hpc.com,cynhpc systemctl status slurmd.service
+server1: ● slurmd.service - Slurm node daemon
+server1:    Loaded: loaded (/usr/lib/systemd/system/slurmd.service; enabled; vendor preset: disabled)
+server1:    Active: failed (Result: exit-code) since Thu 2022-09-29 19:23:40 EAT; 14h ago
+server1:   Process: 19064 ExecStart=/usr/sbin/slurmd -D -s $SLURMD_OPTIONS (code=exited, status=1/FAILURE)
+server1:  Main PID: 19064 (code=exited, status=1/FAILURE)
+server1: 
+server1: Sep 29 19:23:40 server1.hpc.com systemd[1]: Started Slurm node daemon.
+server1: Sep 29 19:23:40 server1.hpc.com slurmd[19064]: slurmd: error: ClusterName 1 specified more than once, latest value used
+server1: Sep 29 19:23:40 server1.hpc.com slurmd[19064]: error: ClusterName 1 specified more than once, latest value used
+server1: Sep 29 19:23:40 server1.hpc.com slurmd[19064]: slurmd: error: Node configuration differs from hardware: CPUs=4:4(hw) Boards=1:1(hw) SocketsPerBoard=4:1(hw) CoresPerSocket=1:2(hw) ThreadsPerCore=1:2(hw)
+server1: Sep 29 19:23:40 server1.hpc.com systemd[1]: slurmd.service: main process exited, code=exited, status=1/FAILURE
+server1: Sep 29 19:23:40 server1.hpc.com systemd[1]: Unit slurmd.service entered failed state.
+server1: Sep 29 19:23:40 server1.hpc.com systemd[1]: slurmd.service failed.
+pdsh@admin: server1: ssh exited with exit code 3
+cynhpc: ● slurmd.service - Slurm node daemon
+cynhpc:    Loaded: loaded (/usr/lib/systemd/system/slurmd.service; enabled; vendor preset: disabled)
+cynhpc:    Active: failed (Result: exit-code) since Thu 2022-09-29 19:23:40 EAT; 14h ago
+cynhpc:   Process: 10069 ExecStart=/usr/sbin/slurmd -D -s $SLURMD_OPTIONS (code=exited, status=1/FAILURE)
+cynhpc:  Main PID: 10069 (code=exited, status=1/FAILURE)
+cynhpc: 
+cynhpc: Sep 29 19:23:40 cynhpc systemd[1]: Started Slurm node daemon.
+cynhpc: Sep 29 19:23:40 cynhpc slurmd[10069]: slurmd: error: ClusterName 1 specified more than once, latest value used
+cynhpc: Sep 29 19:23:40 cynhpc slurmd[10069]: error: ClusterName 1 specified more than once, latest value used
+cynhpc: Sep 29 19:23:40 cynhpc slurmd[10069]: slurmd: error: Node configuration differs from hardware: CPUs=4:4(hw) Boards=1:1(hw) SocketsPerBoard=4:1(hw) CoresPerSocket=1:2(hw) ThreadsPerCore=1:2(hw)
+cynhpc: Sep 29 19:23:40 cynhpc systemd[1]: slurmd.service: main process exited, code=exited, status=1/FAILURE
+cynhpc: Sep 29 19:23:40 cynhpc systemd[1]: Unit slurmd.service entered failed state.
+cynhpc: Sep 29 19:23:40 cynhpc systemd[1]: slurmd.service failed.
+pdsh@admin: cynhpc: ssh exited with exit code 3
+
+```
+
+* The errors recorded in the log files:
+
+```
+[root@admin ~]# pdsh -w server1.hpc.com,cynhpc tail /var/log/slurmd.log
+server1: [2022-09-29T19:23:40.406] error: Node configuration differs from hardware: CPUs=4:4(hw) Boards=1:1(hw) SocketsPerBoard=4:1(hw) CoresPerSocket=1:2(hw) ThreadsPerCore=1:2(hw)
+server1: [2022-09-29T19:23:40.409] error: cgroup namespace 'freezer' not mounted. aborting
+server1: [2022-09-29T19:23:40.409] error: unable to create freezer cgroup namespace
+server1: [2022-09-29T19:23:40.409] error: Couldn't load specified plugin name for proctrack/cgroup: Plugin init() callback failed
+server1: [2022-09-29T19:23:40.409] error: cannot create proctrack context for proctrack/cgroup
+server1: [2022-09-29T19:23:40.409] error: slurmd initialization failed
+cynhpc: [2022-09-29T19:23:40.398] error: Node configuration differs from hardware: CPUs=4:4(hw) Boards=1:1(hw) SocketsPerBoard=4:1(hw) CoresPerSocket=1:2(hw) ThreadsPerCore=1:2(hw)
+cynhpc: [2022-09-29T19:23:40.399] error: cgroup namespace 'freezer' not mounted. aborting
+cynhpc: [2022-09-29T19:23:40.399] error: unable to create freezer cgroup namespace
+cynhpc: [2022-09-29T19:23:40.399] error: Couldn't load specified plugin name for proctrack/cgroup: Plugin init() callback failed
+cynhpc: [2022-09-29T19:23:40.399] error: cannot create proctrack context for proctrack/cgroup
+cynhpc: [2022-09-29T19:23:40.399] error: slurmd initialization failed
+
+```
+
+### 2. Errors on the head node
+
+```
+[root@admin slurm]# systemctl status slurmctld.service
+● slurmctld.service - Slurm controller daemon
+   Loaded: loaded (/usr/lib/systemd/system/slurmctld.service; enabled; vendor preset: disabled)
+   Active: failed (Result: exit-code) since Fri 2022-09-30 09:31:34 EAT; 1min 29s ago
+  Process: 21068 ExecStart=/usr/sbin/slurmctld -D -s $SLURMCTLD_OPTIONS (code=exited, status=1/FAILURE)
+ Main PID: 21068 (code=exited, status=1/FAILURE)
+
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: slurmctld: error: CPUs value "4:4" is not a valid number
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: error: CPUs value "4:4" is not a valid number
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: error: Parse error in file /etc/slurm/slurm.conf line 49: " CPUs=4:4 State=UNKNOWN"
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: slurmctld: error: CPUs value "4:4" is not a valid number
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: slurmctld: error: CPUs value "4:4" is not a valid number
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: error: CPUs value "4:4" is not a valid number
+Sep 30 09:31:34 admin.hpc.com systemd[1]: slurmctld.service: main process exited, code=exited, status=1/FAILURE
+Sep 30 09:31:34 admin.hpc.com slurmctld[21068]: slurmctld: fatal: Unable to process configuration file
+Sep 30 09:31:34 admin.hpc.com systemd[1]: Unit slurmctld.service entered failed state.
+Sep 30 09:31:34 admin.hpc.com systemd[1]: slurmctld.service failed.
+
+```
+* No errors, however, were recorded on the ` /var/log/slurmctld.log` file.
+
+* My Node1, NOde2, head node `slurm.config` file:
+
+
+```
+# slurm.conf file generated by configurator easy.html.
+# Put this file on all nodes of your cluster.
+# See the slurm.conf man page for more information.
+#
+ClusterName=hpc-cluster
+SlurmctldHost=hpcadmin
+#
+#MailProg=/bin/mail
+MpiDefault=none
+#MpiParams=ports=#-#
+ProctrackType=proctrack/cgroup
+ReturnToService=1
+SlurmctldPidFile=/var/run/slurmctld.pid
+#SlurmctldPort=6817
+SlurmdPidFile=/var/run/slurmd.pid
+#SlurmdPort=6818
+SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser=slurm
+#SlurmdUser=root
+StateSaveLocation=/var/spool/slurmctld
+SwitchType=switch/none
+TaskPlugin=task/affinity
+#
+#
+# TIMERS
+#KillWait=30
+#MinJobAge=300
+#SlurmctldTimeout=120
+#SlurmdTimeout=300
+#
+#
+# SCHEDULING
+SchedulerType=sched/backfill
+SelectType=select/cons_tres
+SelectTypeParameters=CR_Core
+#
+#
+# LOGGING AND ACCOUNTING
+AccountingStorageType=accounting_storage/none
+#JobAcctGatherFrequency=30
+JobAcctGatherType=jobacct_gather/none
+#SlurmctldDebug=info
+SlurmctldLogFile=/var/log/slurmctld.log
+#SlurmdDebug=info
+SlurmdLogFile=/var/log/slurmd.log
+#
+#
+# COMPUTE NODES
+NodeName=admin,server1,cynhpc NodeAddr=10.2.13.21,10.4.1.36,10.2.13.29 CPUs=12 CPUs=12 Boards=3 SocketsPerBoard=1 CoresPerSocket=2 ThreadsPerCore=2 RealMemory=10983 State=UNKN$
+PartitionName=debug Nodes=ALL Default=YES MaxTime=INFINITE State=UP
+
+```
+
+* Node1,2 head node `cgroup.config` file:
+
+
+```
+###
+#
+# Slurm cgroup support configuration file
+#
+# See man slurm.conf and man cgroup.conf for further
+# information on cgroup configuration parameters
+#--
+CgroupAutomount=yes
+ConstrainCores=yes
+ConstrainRAMSpace=yes
+ConstrainSwapSpace=yes
+ConstrainDevices=yes
+AllowedRamSpace=100
+AllowedSwapSpace=0
+MaxRAMPercent=100
+MaxSwapPercent=100
+MinRAMSpace=30
+ConstrainKmemSpace=no        #avoid known Kernel issues
+CgroupMountpoint=/sys/fs/cgroup
+CgroupPlugin=autodetect
+IgnoreSystemd=no
+IgnoreSystemdOnFailure=yes
+
+```
+
+* Screenshot of the Web Interface used to create the `slurm.config` file
+ 
+![Screenshot from 2022-09-30 13-07-25](https://user-images.githubusercontent.com/63792575/193247811-9cf13a95-8cfe-4466-a37f-0af0790866bf.png)
+
+
+* Screenshot of the `slurm.config` file generated
+
+![Screenshot from 2022-09-30 13-10-54](https://user-images.githubusercontent.com/63792575/193248102-47854ea3-4602-4842-bd57-814592b921ab.png)
+
+

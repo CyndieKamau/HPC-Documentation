@@ -1,3 +1,4 @@
+```
 # Global Postfix configuration file. This file lists only a subset
 # of all parameters. For the syntax, and for a complete parameter
 # list, see the postconf(5) manual page (command: "man 5 postconf").
@@ -726,3 +727,4 @@ smtp_tls_security_level = encrypt
 # enable Wrapper mode
 smtp_tls_wrappermode = yes
 mailbox_size_limit = 0
+```

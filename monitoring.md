@@ -56,4 +56,14 @@ total 0
 
 ## 4. How to Check the CPU Usage Report of the System Using the sar Command
 
+### 1. Using `sar` command;
+
+```
+(base) [root@hpc01 /]# sar
+Linux 3.10.0-1160.62.1.el7.x86_64 (hpc01.icipe.org) 	25/01/23 	_x86_64_	(64 CPU)
+
+14:24:18          LINUX RESTART
+
+```
+The below `sar` command shows today’s Memory report statistics for the system.
 
